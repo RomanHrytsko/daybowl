@@ -1,0 +1,87 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-paper: #f6f3ee;
+  --color-card: #fffdfa;
+  --color-ink: #2b2723;
+  --color-ink-soft: #6f675e;
+  --color-bowl: #3a342e;
+  --color-bowl-fill: #ece6dc;
+  --color-self: #1f8a70;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #1c1a18;
+    --color-card: #262320;
+    --color-ink: #efe9e1;
+    --color-ink-soft: #a89f94;
+    --color-bowl: #d8d0c5;
+    --color-bowl-fill: #2f2b27;
+    --color-self: #4cc9a4;
+  }
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@utility fill-bowl {
+  fill: var(--color-bowl-fill);
+}
+@utility stroke-bowl {
+  stroke: var(--color-bowl);
+}
+@utility fill-ink-soft {
+  fill: var(--color-ink-soft);
+}
+
+@layer components {
+  .btn-ghost {
+    @apply rounded-full px-3 py-1.5 text-sm text-ink-soft transition hover:bg-ink/5 disabled:opacity-30;
+  }
+  .btn-solid {
+    @apply rounded-full bg-ink px-4 py-1.5 text-sm text-paper transition hover:opacity-90;
+  }
+}
+
+/* Хвиля: зсув фази = горизонтальний зсув на один період (40 одиниць viewBox). */
+@keyframes bowl-wave {
+  from { transform: translateX(0); }
+  to { transform: translateX(40px); }
+}
+.bowl-wave {
+  animation: bowl-wave 3s linear infinite;
+  will-change: transform;
+}
+
+@keyframes bowl-stream {
+  to { stroke-dashoffset: -24; }
+}
+.bowl-stream {
+  stroke-dasharray: 14 2;
+  animation: bowl-stream 0.9s linear infinite;
+}
+
+@keyframes bowl-drop {
+  0% { transform: translateY(-6px); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(10px); opacity: 0; }
+}
+.bowl-drop {
+  animation: bowl-drop 1.6s ease-in infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bowl-wave, .bowl-stream, .bowl-drop {
+    animation: none;
+  }
+}

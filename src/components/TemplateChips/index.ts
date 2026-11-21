@@ -1,0 +1,1 @@
+export { TemplateChips } from './TemplateChips';
