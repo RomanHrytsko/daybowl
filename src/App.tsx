@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { seedIfEmpty } from './data/seed';
 import { getSettings } from './data/repos/settings';
+import { requestPersistence } from './data/persistence';
 import { useUi, type Screen } from './state/uiStore';
 import { WeekScreen } from './screens/WeekScreen';
 import { DayScreen } from './screens/DayScreen';
@@ -21,7 +22,10 @@ const NAV: { id: Screen; label: string; icon: string }[] = [
 export default function App() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    seedIfEmpty().then(() => setReady(true));
+    seedIfEmpty().then(() => {
+      setReady(true);
+      requestPersistence().catch(() => {});
+    });
   }, []);
   const settings = useLiveQuery(() => (ready ? getSettings() : undefined), [ready]);
   const { screen, go, toast } = useUi();

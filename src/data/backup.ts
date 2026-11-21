@@ -1,4 +1,5 @@
 import { db } from './db';
+import { updateSettings } from './repos/settings';
 import type { Activity, ActivityTemplate, Category, DayConfig, Settings } from '../domain/types';
 
 export const BACKUP_FORMAT = 'daybowl-backup';
@@ -62,4 +63,29 @@ export function downloadBackup(b: Backup) {
   a.download = `daybowl-${b.exportedAt.slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Експортує, завантажує файл і запам'ятовує дату копії. */
+export async function saveBackup(): Promise<void> {
+  const b = await exportData();
+  downloadBackup(b);
+  await updateSettings({ lastBackupAt: b.exportedAt });
+}
+
+export const BACKUP_REMIND_DAYS = 7;
+
+/**
+ * Скільки днів минуло від останньої копії, якщо пора нагадати; інакше null.
+ * Без жодної копії відлік іде від завершення онбордингу.
+ */
+export function backupOverdueDays(
+  s: { lastBackupAt?: string; onboardedAt?: string },
+  hasActivities: boolean,
+  now: Date = new Date(),
+): number | null {
+  if (!hasActivities) return null;
+  const since = s.lastBackupAt ?? s.onboardedAt;
+  if (!since) return null;
+  const days = Math.floor((now.getTime() - new Date(since).getTime()) / 86_400_000);
+  return days >= BACKUP_REMIND_DAYS ? days : null;
 }

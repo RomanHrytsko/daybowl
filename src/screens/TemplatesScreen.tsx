@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useCatalog } from '../state/useWeek';
-import { createCategory, updateCategory } from '../data/repos/categories';
-import { createTemplate, updateTemplate } from '../data/repos/templates';
+import {
+  categoryUsage, createCategory, deleteCategory, reassignAndDeleteCategory, updateCategory, type CategoryUsage,
+} from '../data/repos/categories';
+import { createTemplate, deleteTemplate, updateTemplate } from '../data/repos/templates';
+import { useUi } from '../state/uiStore';
 import { SizePicker } from '../components/SizePicker';
 import { today } from '../domain/dates';
 import type { ActivityTemplate, Category, CategoryKind } from '../domain/types';
@@ -37,7 +40,7 @@ export function TemplatesScreen() {
           </button>
         </div>
         <ul className="flex flex-col gap-2">
-          {visibleCats.map((c) => <CategoryRow key={c.id} c={c} />)}
+          {visibleCats.map((c) => <CategoryRow key={c.id} c={c} all={categories} />)}
         </ul>
       </section>
 
@@ -50,7 +53,7 @@ export function TemplatesScreen() {
             onClick={() =>
               createTemplate({
                 title: uk.templates.newTemplate,
-                categoryId: categories.find((c) => !c.archived)?.id ?? categories[0].id,
+                categoryId: categories.find((c) => !c.archived)?.id ?? categories[0]?.id ?? '',
                 defaultMinutes: 60,
               })
             }
@@ -66,9 +69,38 @@ export function TemplatesScreen() {
   );
 }
 
-function CategoryRow({ c }: { c: Category }) {
+function CategoryRow({ c, all }: { c: Category; all: Category[] }) {
+  const showToast = useUi((s) => s.showToast);
+  const [usage, setUsage] = useState<CategoryUsage | null>(null);
+  const others = all.filter((x) => x.id !== c.id);
+  const targets = others.filter((x) => !x.archived).length ? others.filter((x) => !x.archived) : others;
+  const [target, setTarget] = useState('');
+
+  const onDelete = async () => {
+    if (!others.length) return showToast(uk.templates.lastCategory);
+    const u = await categoryUsage(c.id);
+    if (u.activities || u.templates) {
+      setTarget(targets[0]?.id ?? '');
+      setUsage(u);
+      return;
+    }
+    if (!confirm(uk.templates.deleteCategoryConfirm(c.name))) return;
+    await deleteCategory(c.id);
+    showToast(uk.templates.deleted);
+  };
+
+  const onReassign = async () => {
+    try {
+      await reassignAndDeleteCategory(c.id, target);
+      showToast(uk.templates.deleted);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   return (
-    <li className={`flex flex-wrap items-center gap-2 rounded-xl bg-card px-3 py-2 shadow-sm ${c.archived ? 'opacity-50' : ''}`}>
+    <li className={`flex flex-col gap-2 rounded-xl bg-card px-3 py-2 shadow-sm ${c.archived ? 'opacity-50' : ''}`}>
+      <div className="flex flex-wrap items-center gap-2">
       <input
         type="color"
         value={c.color}
@@ -93,6 +125,43 @@ function CategoryRow({ c }: { c: Category }) {
       <button type="button" className="btn-ghost text-sm" onClick={() => updateCategory(c.id, { archived: !c.archived })}>
         {c.archived ? uk.templates.restore : uk.templates.archive}
       </button>
+      <button type="button" className="btn-ghost text-sm" onClick={onDelete} aria-label={`${uk.templates.delete} ${c.name}`}>
+        {uk.templates.delete}
+      </button>
+      </div>
+      {usage && (
+        <div role="dialog" aria-label={uk.templates.deleteCategoryConfirm(c.name)} className="flex flex-wrap items-center gap-2 rounded-lg bg-ink/5 px-3 py-2 text-sm">
+          <span className="w-full">{uk.templates.inUse(usage.activities, usage.templates)}</span>
+          {!c.archived && (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => {
+                updateCategory(c.id, { archived: true });
+                setUsage(null);
+              }}
+            >
+              {uk.templates.archive}
+            </button>
+          )}
+          <label className="flex items-center gap-1">
+            {uk.templates.moveTo}
+            <select
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              className="rounded-md border border-ink/15 bg-transparent px-2 py-1"
+            >
+              {targets.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+          </label>
+          <button type="button" className="btn-solid" disabled={!target} onClick={onReassign}>
+            {uk.templates.moveAndDelete}
+          </button>
+          <button type="button" className="btn-ghost" onClick={() => setUsage(null)}>
+            {uk.templates.cancel}
+          </button>
+        </div>
+      )}
     </li>
   );
 }
@@ -146,6 +215,14 @@ function TemplateRow({ t, categories }: { t: ActivityTemplate; categories: Categ
         </select>
         <button type="button" className="btn-ghost text-sm" onClick={() => updateTemplate(t.id, { archived: !t.archived })}>
           {t.archived ? uk.templates.restore : uk.templates.archive}
+        </button>
+        <button
+          type="button"
+          className="btn-ghost text-sm"
+          aria-label={`${uk.templates.delete} ${t.title}`}
+          onClick={() => confirm(uk.templates.deleteTemplateConfirm(t.title)) && deleteTemplate(t.id)}
+        >
+          {uk.templates.delete}
         </button>
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">

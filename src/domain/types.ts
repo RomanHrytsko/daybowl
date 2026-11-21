@@ -71,6 +71,10 @@ export interface Settings {
   schemaVersion: number;
   /** коли користувач завершив перше налаштування */
   onboardedAt?: string;
+  /** коли востаннє завантажено резервну копію (ISO) */
+  lastBackupAt?: string;
+  /** коли закрито підказку «Встанови як застосунок» (ISO) */
+  installHintDismissedAt?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {

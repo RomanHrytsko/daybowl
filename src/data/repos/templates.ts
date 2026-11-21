@@ -24,3 +24,8 @@ export async function bumpUsage(id: string) {
     t.usageCount += 1;
   });
 }
+
+/** Фізично видаляє шаблон. Вже створені справи лишаються: у них власні назва, категорія і хвилини. */
+export async function deleteTemplate(id: string) {
+  await db.templates.delete(id);
+}
