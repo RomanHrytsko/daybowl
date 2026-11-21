@@ -8,7 +8,8 @@
   --color-bowl: #3a342e;
   --color-bowl-fill: #ece6dc;
   --color-self: #1f8a70;
-  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* на iPhone/Mac це SF Pro; Inter не завантажується, тож не вказуємо його */
+  --font-sans: -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,8 +24,25 @@
   }
 }
 
+/* R3. Safe area: лише env(), жодних чисел під конкретну модель. */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  /* висота нижньої таб-панелі без safe area */
+  --tabbar-h: 56px;
+}
+
 html {
   color-scheme: light dark;
+  /* у standalone без «гумового» відтягування всієї сторінки разом із таб-панеллю */
+  overscroll-behavior-y: none;
+  /* фокус і scrollIntoView лишають елемент між sticky-шапкою і таб-панеллю */
+  scroll-padding-top: calc(var(--sat) + 64px);
+  scroll-padding-bottom: calc(var(--tabbar-h) + var(--sab) + 8px);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -32,25 +50,96 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
+  padding-left: var(--sal);
+  padding-right: var(--sar);
 }
 
-@utility fill-bowl {
-  fill: var(--color-bowl-fill);
-}
-@utility stroke-bowl {
-  stroke: var(--color-bowl);
-}
-@utility fill-ink-soft {
-  fill: var(--color-ink-soft);
+@layer base {
+  /* R1. < 16px → Safari збільшує сторінку при фокусі */
+  input, select, textarea {
+    font-size: max(16px, 1em);
+  }
+  /* R5. Фокусоване поле не ховається під клавіатурою */
+  input, select, textarea {
+    scroll-margin-bottom: 120px;
+  }
+  /* R4. Кнопки й перетягувані елементи: без виділення тексту і меню iOS */
+  button, [role='button'], [role='switch'], .no-callout {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
+  }
 }
 
+/* R5. Під час введення таб-панель ховається, щоб не стрибала над клавіатурою. */
+body:has(input:not([type='checkbox'], [type='radio'], [type='color'], [type='file'], [type='range']):focus, select:focus, textarea:focus) .tabbar {
+  display: none;
+}
+
+@utility field {
+  min-height: 44px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in oklab, var(--color-ink) 15%, transparent);
+  background-color: transparent;
+  padding-inline: 12px;
+  font-size: max(16px, 1rem);
+  line-height: 1.5;
+  color: var(--color-ink);
+  &:focus {
+    outline: 2px solid color-mix(in oklab, var(--color-self) 60%, transparent);
+    outline-offset: 1px;
+  }
+}
+
+@utility field-select {
+  @apply field;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%238a8178' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 8px;
+  & option {
+    background-color: var(--color-card);
+    color: var(--color-ink);
+  }
+}
+
+/* fill-bowl-fill / stroke-bowl / fill-ink-soft — штатні утиліти з кольорів теми.
+   Власна @utility fill-bowl конфліктувала з темною fill-bowl від --color-bowl. */
+
+/* R2. Зони дотику ≥ 44 × 44 */
 @layer components {
   .btn-ghost {
-    @apply rounded-full px-3 py-1.5 text-sm text-ink-soft transition hover:bg-ink/5 disabled:opacity-30;
+    @apply inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full px-3 text-sm text-ink-soft transition hover:bg-ink/5 active:bg-ink/10 disabled:opacity-30;
   }
   .btn-solid {
-    @apply rounded-full bg-ink px-4 py-1.5 text-sm text-paper transition hover:opacity-90;
+    @apply inline-flex min-h-11 items-center justify-center gap-1 rounded-full bg-ink px-4 text-sm font-medium text-paper transition hover:opacity-90 active:opacity-80 disabled:opacity-40;
   }
+  .btn-outline {
+    @apply inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-ink/15 px-4 text-base text-ink transition hover:bg-ink/5 active:bg-ink/10;
+  }
+  .btn-danger {
+    @apply bg-rose-700 text-white;
+  }
+  .btn-outline-danger {
+    @apply border-rose-700/30 text-rose-700 dark:text-rose-400;
+  }
+}
+
+.sheet-backdrop {
+  animation: sheet-fade 0.2s ease-out;
+}
+.sheet-panel {
+  animation: sheet-up 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes sheet-fade {
+  from { opacity: 0; }
+}
+@keyframes sheet-up {
+  from { transform: translateY(24px); opacity: 0; }
 }
 
 /* Хвиля: зсув фази = горизонтальний зсув на один період (40 одиниць viewBox). */
@@ -81,7 +170,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bowl-wave, .bowl-stream, .bowl-drop {
+  .bowl-wave, .bowl-stream, .bowl-drop, .sheet-backdrop, .sheet-panel {
     animation: none;
   }
 }

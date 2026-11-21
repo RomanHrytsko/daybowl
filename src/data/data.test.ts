@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Dexie from 'dexie';
 import { DaybowlDB, SCHEMA_V1, db } from './db';
 import { seedIfEmpty } from './seed';
@@ -9,7 +9,7 @@ import { createTemplate, deleteTemplate } from './repos/templates';
 import {
   CategoryInUseError, categoryUsage, createCategory, deleteCategory, reassignAndDeleteCategory,
 } from './repos/categories';
-import { getSettings } from './repos/settings';
+import { getSettings, updateSettings } from './repos/settings';
 import { backupOverdueDays, exportData, importData, parseBackup, saveBackup } from './backup';
 import { act, cat, tpl } from '../test/factories';
 
@@ -119,6 +119,49 @@ describe('нагадування про копію', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     await saveBackup();
     expect((await getSettings()).lastBackupAt).toBeTruthy();
+  });
+
+  describe('Web Share (iOS)', () => {
+    const nav = navigator as unknown as Record<string, unknown>;
+    afterEach(() => {
+      delete nav.canShare;
+      delete nav.share;
+      vi.restoreAllMocks();
+    });
+
+    it('передає підготовлений файл у меню «Поділитися» без завантаження', async () => {
+      const share = vi.fn().mockResolvedValue(undefined);
+      nav.canShare = () => true;
+      nav.share = share;
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      const snapshot = await exportData();
+
+      expect(await saveBackup(snapshot)).toBe('shared');
+      const file = share.mock.calls[0][0].files[0] as File;
+      expect(file.name).toMatch(/^daybowl-\d{4}-\d{2}-\d{2}\.json$/);
+      expect(file.type).toBe('application/json');
+      expect(parseBackup(await file.text()).format).toBe('daybowl-backup');
+      expect(click).not.toHaveBeenCalled();
+      expect((await getSettings()).lastBackupAt).toBeTruthy();
+    });
+
+    it('скасування меню не вважається копією', async () => {
+      await updateSettings({ lastBackupAt: undefined });
+      nav.canShare = () => true;
+      nav.share = () => Promise.reject(new DOMException('cancel', 'AbortError'));
+      expect(await saveBackup()).toBe('cancelled');
+      expect((await getSettings()).lastBackupAt).toBeUndefined();
+    });
+
+    it('без дозволу на share падає назад на завантаження', async () => {
+      URL.createObjectURL ??= () => 'blob:x';
+      URL.revokeObjectURL ??= () => {};
+      nav.canShare = () => true;
+      nav.share = () => Promise.reject(new DOMException('no gesture', 'NotAllowedError'));
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      expect(await saveBackup()).toBe('downloaded');
+      expect(click).toHaveBeenCalledOnce();
+    });
   });
 });
 

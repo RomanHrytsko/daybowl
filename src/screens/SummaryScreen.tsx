@@ -4,7 +4,7 @@ import { useUi } from '../state/uiStore';
 import { addDaysStr } from '../domain/dates';
 import { formatHours } from '../domain/format';
 import { uk } from '../i18n/uk';
-import { IconButton, Stat, weekRange } from './shared';
+import { IconButton, ScreenHeader, Stat, weekRange } from './shared';
 
 export function SummaryScreen() {
   const { weekStart, setWeek } = useUi();
@@ -30,14 +30,14 @@ export function SummaryScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">{uk.summary.title}</h1>
-        <div className="flex items-center gap-1">
+      <ScreenHeader className="justify-between">
+        <h1 className="truncate text-lg font-semibold md:text-xl">{uk.summary.title}</h1>
+        <div className="-mr-3 flex items-center md:mr-0">
           <IconButton label={uk.week.prev} onClick={() => setWeek(addDaysStr(weekStart, -7))}>‹</IconButton>
-          <div className="min-w-32 text-center font-medium">{weekRange(weekStart)}</div>
+          <div className="min-w-24 text-center text-sm font-medium md:min-w-32 md:text-base">{weekRange(weekStart)}</div>
           <IconButton label={uk.week.next} onClick={() => setWeek(addDaysStr(weekStart, 7))}>›</IconButton>
         </div>
-      </header>
+      </ScreenHeader>
 
       <section className="rounded-2xl bg-card p-5 shadow-sm">
         <div className="text-sm text-ink-soft">{uk.summary.self}</div>
@@ -54,9 +54,9 @@ export function SummaryScreen() {
         <h2 className="mb-2 font-medium">{uk.summary.byCategory}</h2>
         <ul className="flex flex-col gap-2">
           {cats.map(({ c, m }) => (
-            <li key={c.id} className="grid grid-cols-[7rem_1fr_4.5rem] items-center gap-2 text-sm">
+            <li key={c.id} className="grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-1 text-sm md:grid-cols-[7rem_1fr_4.5rem]">
               <span className="truncate">{c.name}</span>
-              <span className="h-3 rounded-full bg-ink/5">
+              <span className="col-span-2 row-start-2 h-3 rounded-full bg-ink/5 md:col-span-1 md:row-start-auto">
                 <span className="block h-3 rounded-full" style={{ width: `${(m / maxCat) * 100}%`, background: c.color }} />
               </span>
               <span className="text-right tabular-nums text-ink-soft">{formatHours(m)}</span>
@@ -67,7 +67,7 @@ export function SummaryScreen() {
 
       <section>
         <h2 className="mb-2 font-medium">{uk.summary.trend}</h2>
-        <div className="flex h-36 items-end gap-3">
+        <div className="flex h-36 items-end gap-2 md:gap-3">
           {weeks.map((w, i) => (
             <div key={w.weekStart} className="flex flex-1 flex-col items-center gap-1">
               <span className="text-xs tabular-nums text-ink-soft">{formatHours(w.stats.selfMinutes)}</span>

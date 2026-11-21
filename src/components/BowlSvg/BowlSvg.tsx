@@ -21,6 +21,8 @@ interface Props {
   showFreeLabel?: boolean;
   className?: string;
   label?: string;
+  /** мініатюра для сітки тижня: без підписів і крапель, хвиля без анімації */
+  mini?: boolean;
 }
 
 const PERIOD = 40;
@@ -32,7 +34,7 @@ const STREAM = overflowStreamPath();
  * Чаша з шарами рідини. Знає лише DayStats і список шарів —
  * нічого про сховище, тож її можна замінити на Canvas чи 3D.
  */
-export function BowlSvg({ stats, layers, showFreeLabel, className, label }: Props) {
+export function BowlSvg({ stats, layers, showFreeLabel, className, label, mini }: Props) {
   const clipId = useId();
   const reduce = useReducedMotion();
   const { capacity, overflowMinutes, freeMinutes } = stats;
@@ -55,15 +57,17 @@ export function BowlSvg({ stats, layers, showFreeLabel, className, label }: Prop
   const topY = placed.length ? placed[placed.length - 1].y : BOT;
   const spillColor = overflowMinutes > 0 ? spillingColor(layers, capacity) : undefined;
   const streamWidth = Math.min(7, 1.6 + overflowMinutes / 40);
-  const drops = overflowMinutes > 0 ? Math.min(4, Math.ceil(overflowMinutes / 60)) : 0;
-  const transition = reduce ? { duration: 0 } : { type: 'spring' as const, stiffness: 120, damping: 18 };
+  const drops = overflowMinutes > 0 && !mini ? Math.min(4, Math.ceil(overflowMinutes / 60)) : 0;
+  const still = reduce || mini;
+  const transition = still ? { duration: 0 } : { type: 'spring' as const, stiffness: 120, damping: 18 };
 
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
       className={className}
-      role="img"
+      role={label ? 'img' : undefined}
       aria-label={label}
+      aria-hidden={label ? undefined : true}
     >
       <defs>
         <clipPath id={clipId}>
@@ -71,19 +75,19 @@ export function BowlSvg({ stats, layers, showFreeLabel, className, label }: Prop
         </clipPath>
       </defs>
 
-      <path d={CLIP} className="fill-bowl" />
+      <path d={CLIP} className="fill-bowl-fill" />
 
       <g clipPath={`url(#${clipId})`}>
         {[...placed].reverse().map((l) => (
           <motion.g
             key={l.id}
-            initial={{ y: BOT + 6 }}
+            initial={mini ? false : { y: BOT + 6 }}
             animate={{ y: l.y }}
             transition={transition}
           >
             <g
-              className="bowl-wave"
-              style={{ animationDuration: `${3 + (l.i % 3) * 0.9}s`, animationDelay: `${-l.i * 0.7}s` }}
+              className={mini ? undefined : 'bowl-wave'}
+              style={mini ? undefined : { animationDuration: `${3 + (l.i % 3) * 0.9}s`, animationDelay: `${-l.i * 0.7}s` }}
             >
               <path d={wavePath(PERIOD, 1.6)} fill={l.color} transform={`translate(${-PERIOD} 0)`}>
                 <title>{`${l.title} · ${formatHours(l.minutes)}`}</title>
@@ -102,7 +106,7 @@ export function BowlSvg({ stats, layers, showFreeLabel, className, label }: Prop
             strokeWidth={streamWidth}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="bowl-stream"
+            className={mini ? undefined : 'bowl-stream'}
           />
           {Array.from({ length: drops }, (_, k) => (
             <circle
@@ -126,11 +130,11 @@ export function BowlSvg({ stats, layers, showFreeLabel, className, label }: Prop
         </g>
       )}
 
-      <path d={OUTLINE} className="stroke-bowl" fill="none" strokeWidth={2.2} strokeLinejoin="round" />
-      <line x1={CX - R_TOP - 4} x2={CX - R_TOP + 1} y1={RIM} y2={RIM} className="stroke-bowl" strokeWidth={2.2} strokeLinecap="round" />
-      <line x1={CX + R_TOP - 1} x2={CX + R_TOP + 4} y1={RIM} y2={RIM} className="stroke-bowl" strokeWidth={2.2} strokeLinecap="round" />
+      <path d={OUTLINE} className="stroke-bowl" fill="none" strokeWidth={mini ? 5 : 2.2} strokeLinejoin="round" />
+      <line x1={CX - R_TOP - 4} x2={CX - R_TOP + 1} y1={RIM} y2={RIM} className="stroke-bowl" strokeWidth={mini ? 5 : 2.2} strokeLinecap="round" />
+      <line x1={CX + R_TOP - 1} x2={CX + R_TOP + 4} y1={RIM} y2={RIM} className="stroke-bowl" strokeWidth={mini ? 5 : 2.2} strokeLinecap="round" />
 
-      {showFreeLabel && freeMinutes > 0 && topY - RIM > 14 && (
+      {showFreeLabel && !mini && freeMinutes > 0 && topY - RIM > 14 && (
         <text
           x={CX}
           y={(RIM + topY) / 2 + 3}

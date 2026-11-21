@@ -4,8 +4,11 @@ import { db } from '../data/db';
 import { getSettings, updateSettings } from '../data/repos/settings';
 import { backupOverdueDays, saveBackup } from '../data/backup';
 import { isStandalone } from '../data/persistence';
+import { useBackupSnapshot } from '../state/useBackupSnapshot';
+import { useUi } from '../state/uiStore';
 import { nowIso } from '../domain/dates';
 import { uk } from '../i18n/uk';
+import { IconButton } from './shared';
 
 /** М'які підказки над тижнем: встановити як застосунок і зберегти резервну копію. */
 export function WeekBanners() {
@@ -14,6 +17,8 @@ export function WeekBanners() {
     async () => !!(await db.activities.filter((a) => !a.deletedAt).first()),
     [],
   );
+  const snapshot = useBackupSnapshot();
+  const showToast = useUi((s) => s.showToast);
   if (!settings || hasActivities === undefined) return null;
 
   const showInstall = !settings.installHintDismissedAt && !isStandalone();
@@ -24,37 +29,35 @@ export function WeekBanners() {
     <div className="flex flex-col gap-2">
       {overdue !== null && (
         <Banner>
-          <span className="mr-auto">
-            {settings.lastBackupAt ? uk.week.backupDue(overdue) : uk.week.backupNever(overdue)}
-          </span>
-          <button type="button" className="btn-solid text-sm" onClick={() => saveBackup()}>
+          <p>{settings.lastBackupAt ? uk.week.backupDue(overdue) : uk.week.backupNever(overdue)}</p>
+          <button
+            type="button"
+            className="btn-solid w-full sm:w-auto sm:self-start"
+            onClick={() => saveBackup(snapshot, uk.settings.shareTitle).catch((e) => showToast(String(e)))}
+          >
             {uk.week.saveBackup}
           </button>
         </Banner>
       )}
       {showInstall && (
-        <Banner>
-          <div className="mr-auto min-w-0 flex-1">
-            <div>{uk.week.installHint}</div>
-            <div className="text-xs text-ink-soft">{uk.week.installHow}</div>
-          </div>
-          <button
-            type="button"
-            className="btn-ghost text-sm"
-            onClick={() => updateSettings({ installHintDismissedAt: nowIso() })}
-          >
-            {uk.week.dismiss}
-          </button>
+        <Banner onClose={() => updateSettings({ installHintDismissedAt: nowIso() })}>
+          <div>{uk.week.installHint}</div>
+          <div className="text-xs text-ink-soft">{uk.week.installHow}</div>
         </Banner>
       )}
     </div>
   );
 }
 
-function Banner({ children }: { children: ReactNode }) {
+function Banner({ children, onClose }: { children: ReactNode; onClose?: () => void }) {
   return (
-    <div role="note" className="flex flex-wrap items-center gap-3 rounded-2xl bg-card px-4 py-3 text-sm shadow-sm">
-      {children}
+    <div role="note" className="relative flex flex-col gap-2 rounded-2xl bg-card px-4 py-3 text-sm shadow-sm">
+      {onClose && (
+        <div className="absolute top-0 right-0">
+          <IconButton label={uk.week.dismiss} onClick={onClose}>✕</IconButton>
+        </div>
+      )}
+      <div className={`flex flex-col gap-2 ${onClose ? 'pr-8' : ''}`}>{children}</div>
     </div>
   );
 }
