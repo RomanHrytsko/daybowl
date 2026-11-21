@@ -30,7 +30,7 @@ export function TemplateChips({ templates, categories, onPick, onCustom }: Props
               key={t.id}
               type="button"
               onClick={() => onPick(t)}
-              className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition active:scale-95 hover:shadow-sm"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm transition active:scale-95 hover:shadow-sm"
               style={{ borderColor: c?.color, background: `${c?.color ?? '#888'}1f` }}
             >
               <span className="h-2 w-2 rounded-full" style={{ background: c?.color }} aria-hidden />
@@ -43,7 +43,7 @@ export function TemplateChips({ templates, categories, onPick, onCustom }: Props
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="rounded-full border border-dashed border-ink/30 px-3 py-1.5 text-sm text-ink-soft hover:border-ink/60"
+          className="inline-flex min-h-11 items-center rounded-full border border-dashed border-ink/30 px-3.5 text-sm text-ink-soft hover:border-ink/60"
         >
           + {uk.day.custom}
         </button>
@@ -72,7 +72,7 @@ function CustomForm({
   const [minutes, setMinutes] = useState(60);
   return (
     <form
-      className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-card p-3 shadow-sm"
+      className="mt-3 flex flex-col gap-3 rounded-xl bg-card p-3 shadow-sm"
       onSubmit={(e) => {
         e.preventDefault();
         if (!title.trim() || !categoryId) return;
@@ -84,19 +84,25 @@ function CustomForm({
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder={uk.day.titlePh}
-        className="min-w-0 flex-1 rounded-md border border-ink/15 bg-transparent px-2 py-1"
+        aria-label={uk.day.titlePh}
+        enterKeyHint="done"
+        autoCapitalize="sentences"
+        autoCorrect="on"
+        onKeyDown={(e) => e.key === 'Enter' && !title.trim() && e.preventDefault()}
+        className="field w-full"
       />
       <select
         value={categoryId}
         onChange={(e) => setCategoryId(e.target.value)}
-        className="rounded-md border border-ink/15 bg-transparent px-2 py-1"
+        aria-label={uk.day.category}
+        className="field-select w-full"
       >
         {categories.map((c) => (
           <option key={c.id} value={c.id}>{c.name}</option>
         ))}
       </select>
       <SizePicker minutes={minutes} onChange={setMinutes} />
-      <button type="submit" className="rounded-md bg-ink px-3 py-1 text-paper">{uk.day.add}</button>
+      <button type="submit" className="btn-solid w-full text-base" disabled={!title.trim()}>{uk.day.add}</button>
     </form>
   );
 }

@@ -1,26 +1,47 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getSettings, updateSettings } from '../data/repos/settings';
-import { importData, parseBackup, saveBackup } from '../data/backup';
+import { importData, parseBackup, saveBackup, type Backup } from '../data/backup';
 import { storageStatus, type StorageStatus } from '../data/persistence';
+import { useBackupSnapshot } from '../state/useBackupSnapshot';
 import { useUi } from '../state/uiStore';
+import { NumberField } from '../components/NumberField';
+import { ConfirmSheet } from '../components/ConfirmSheet';
 import { uk } from '../i18n/uk';
+import { ScreenHeader } from './shared';
 
 export function SettingsScreen() {
   const settings = useLiveQuery(() => getSettings(), []);
+  const snapshot = useBackupSnapshot();
   const fileRef = useRef<HTMLInputElement>(null);
   const showToast = useUi((s) => s.showToast);
   const [storage, setStorage] = useState<StorageStatus>();
+  const [pendingImport, setPendingImport] = useState<Backup | null>(null);
   useEffect(() => {
     storageStatus().then(setStorage).catch(() => {});
   }, []);
-  if (!settings) return null;
 
-  const onImport = async (file: File) => {
+  const header = (
+    <ScreenHeader>
+      <h1 className="text-lg font-semibold md:sr-only">{uk.settings.title}</h1>
+    </ScreenHeader>
+  );
+  if (!settings) return header;
+
+  const onPick = async (file: File) => {
     try {
-      const backup = parseBackup(await file.text());
-      if (!confirm(uk.settings.importConfirm)) return;
-      await importData(backup);
+      setPendingImport(parseBackup(await file.text()));
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const onImport = async () => {
+    const b = pendingImport;
+    setPendingImport(null);
+    if (!b) return;
+    try {
+      await importData(b);
       showToast(uk.settings.imported);
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e));
@@ -28,23 +49,20 @@ export function SettingsScreen() {
   };
 
   return (
-    <div className="flex max-w-xl flex-col gap-6">
-      <section className="rounded-2xl bg-card p-4 shadow-sm">
+    <div className="flex max-w-xl flex-col gap-4 md:gap-6">
+      {header}
+      <section className="flex flex-col gap-2 rounded-2xl bg-card p-4 shadow-sm">
         <label htmlFor="defcap" className="font-medium">{uk.settings.capacity}</label>
         <p className="text-sm text-ink-soft">{uk.settings.capacityHint}</p>
-        <input
+        <NumberField
           id="defcap"
-          type="number"
+          label={uk.settings.capacity}
+          value={settings.defaultCapacityMinutes / 60}
+          onChange={(h) => updateSettings({ defaultCapacityMinutes: Math.round(h * 60) })}
           min={1}
           max={24}
           step={0.5}
-          key={settings.defaultCapacityMinutes}
-          defaultValue={settings.defaultCapacityMinutes / 60}
-          onBlur={(e) => {
-            const h = Number(e.target.value);
-            if (h > 0 && h <= 24) updateSettings({ defaultCapacityMinutes: Math.round(h * 60) });
-          }}
-          className="mt-2 w-24 rounded-md border border-ink/15 bg-transparent px-2 py-1 text-lg tabular-nums"
+          unit="год"
         />
       </section>
 
@@ -55,21 +73,25 @@ export function SettingsScreen() {
           {settings.lastBackupAt ? uk.settings.lastBackup(formatDateTime(settings.lastBackupAt)) : uk.settings.noBackup}
         </p>
         <p className="text-xs text-ink-soft">{uk.settings.backupTip}</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className="btn-solid" onClick={() => saveBackup()}>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            className="btn-solid w-full text-base sm:w-auto"
+            onClick={() => saveBackup(snapshot, uk.settings.shareTitle).catch((e) => showToast(String(e)))}
+          >
             {uk.settings.export}
           </button>
-          <button type="button" className="btn-ghost" onClick={() => fileRef.current?.click()}>
+          <button type="button" className="btn-outline w-full sm:w-auto" onClick={() => fileRef.current?.click()}>
             {uk.settings.import}
           </button>
           <input
             ref={fileRef}
             type="file"
-            accept="application/json,.json"
+            accept="application/json,.json,public.json"
             hidden
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) onImport(f);
+              if (f) onPick(f);
               e.target.value = '';
             }}
           />
@@ -87,9 +109,19 @@ export function SettingsScreen() {
         <p className="mt-1 text-xs text-ink-soft">{uk.settings.version(__APP_VERSION__)}</p>
       </section>
 
-      <button type="button" className="btn-ghost self-start" onClick={() => updateSettings({ onboardedAt: undefined })}>
+      <button type="button" className="btn-outline w-full sm:w-auto sm:self-start" onClick={() => updateSettings({ onboardedAt: undefined })}>
         {uk.settings.onboarding}
       </button>
+
+      <ConfirmSheet
+        open={!!pendingImport}
+        title={uk.settings.importTitle}
+        message={uk.settings.importConfirm}
+        confirmLabel={uk.settings.importAction}
+        destructive
+        onCancel={() => setPendingImport(null)}
+        onConfirm={onImport}
+      />
     </div>
   );
 }

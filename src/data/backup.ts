@@ -55,21 +55,55 @@ export async function importData(b: Backup): Promise<void> {
   });
 }
 
+export function backupFileName(b: Backup) {
+  return `daybowl-${b.exportedAt.slice(0, 10)}.json`;
+}
+
 export function downloadBackup(b: Backup) {
   const blob = new Blob([JSON.stringify(b, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `daybowl-${b.exportedAt.slice(0, 10)}.json`;
+  a.download = backupFileName(b);
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  // Safari читає blob асинхронно — не відкликаємо URL одразу
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-/** Експортує, завантажує файл і запам'ятовує дату копії. */
-export async function saveBackup(): Promise<void> {
-  const b = await exportData();
-  downloadBackup(b);
+/** 'shared' — файл передано в меню «Поділитися» чи завантажено; 'cancelled' — користувач закрив меню. */
+export type SaveResult = 'shared' | 'downloaded' | 'cancelled';
+
+/**
+ * Зберігає копію. На iOS (особливо у встановленому застосунку) `<a download>` не працює,
+ * тож відкриваємо меню «Поділитися» → «Зберегти в Файли».
+ *
+ * `navigator.share` вимагає жесту користувача: між тапом і викликом не має бути `await`.
+ * Тому дані краще підготувати заздалегідь (`useBackupSnapshot`) і передати сюди як `prepared`.
+ */
+export async function saveBackup(prepared?: Backup, shareTitle = 'Чаша дня — копія'): Promise<SaveResult> {
+  const b: Backup = prepared
+    ? { ...prepared, exportedAt: new Date().toISOString() }
+    : await exportData();
+  const file = new File([JSON.stringify(b, null, 2)], backupFileName(b), { type: 'application/json' });
+  let result: SaveResult;
+  if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: shareTitle });
+      result = 'shared';
+    } catch (e) {
+      if ((e as DOMException).name === 'AbortError') return 'cancelled';
+      // NotAllowedError (жест втрачено) та інше — пробуємо звичайне завантаження
+      downloadBackup(b);
+      result = 'downloaded';
+    }
+  } else {
+    downloadBackup(b);
+    result = 'downloaded';
+  }
   await updateSettings({ lastBackupAt: b.exportedAt });
+  return result;
 }
 
 export const BACKUP_REMIND_DAYS = 7;

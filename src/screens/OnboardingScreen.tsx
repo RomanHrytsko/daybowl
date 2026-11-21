@@ -4,6 +4,9 @@ import { updateCategory } from '../data/repos/categories';
 import { createTemplate, updateTemplate } from '../data/repos/templates';
 import { updateSettings } from '../data/repos/settings';
 import { SizePicker } from '../components/SizePicker';
+import { TextField } from '../components/TextField';
+import { NumberField } from '../components/NumberField';
+import { IconButton } from './shared';
 import { WeekdayToggles } from './TemplatesScreen';
 import { nowIso, today, weekStartOf } from '../domain/dates';
 import { uk } from '../i18n/uk';
@@ -50,7 +53,7 @@ export function OnboardingScreen() {
   };
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6 py-6">
+    <div className="mx-auto flex max-w-2xl flex-col gap-6 pt-6">
       <header>
         <h1 className="text-2xl font-semibold">{uk.onboarding.title}</h1>
         <p className="mt-1 text-ink-soft">{uk.onboarding.intro}</p>
@@ -59,15 +62,15 @@ export function OnboardingScreen() {
       <section className="flex flex-col gap-2">
         <h2 className="font-semibold">{uk.onboarding.step1}</h2>
         <p className="text-sm text-ink-soft">{uk.onboarding.step1Hint}</p>
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
           {categories.filter((c) => !c.archived).map((c) => (
             <li key={c.id} className="flex items-center gap-2 rounded-xl bg-card px-3 py-2 shadow-sm">
-              <span className="h-4 w-4 rounded-full" style={{ background: c.color }} aria-hidden />
-              <input
-                defaultValue={c.name}
-                onBlur={(e) => e.target.value.trim() && updateCategory(c.id, { name: e.target.value.trim() })}
-                aria-label="Назва категорії"
-                className="min-w-0 flex-1 bg-transparent"
+              <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: c.color }} aria-hidden />
+              <TextField
+                value={c.name}
+                onSave={(name) => updateCategory(c.id, { name })}
+                aria-label={uk.templates.categoryName}
+                className="min-w-0 flex-1"
               />
               <span className={`text-xs ${c.kind === 'self' ? 'text-self' : 'text-ink-soft'}`}>{uk.kinds[c.kind]}</span>
             </li>
@@ -78,18 +81,15 @@ export function OnboardingScreen() {
       <section className="flex flex-col gap-2">
         <h2 className="font-semibold">{uk.onboarding.step2}</h2>
         <p className="text-sm text-ink-soft">{uk.onboarding.step2Hint}</p>
-        <label className="flex items-center gap-2">
-          <input
-            type="number"
-            min={1}
-            max={24}
-            step={0.5}
-            value={capHours}
-            onChange={(e) => setHours(Number(e.target.value))}
-            className="w-20 rounded-md border border-ink/15 bg-transparent px-2 py-1 text-lg tabular-nums"
-          />
-          год
-        </label>
+        <NumberField
+          label={uk.onboarding.step2}
+          value={capHours}
+          onChange={setHours}
+          min={1}
+          max={24}
+          step={0.5}
+          unit="год"
+        />
       </section>
 
       <section className="flex flex-col gap-2">
@@ -100,27 +100,25 @@ export function OnboardingScreen() {
             const set = (patch: Partial<RecRow>) =>
               setRows(recRows.map((x, k) => (k === i ? { ...x, ...patch } : x)));
             return (
-              <li key={i} className="flex flex-wrap items-center gap-2 rounded-xl bg-card px-3 py-2 shadow-sm">
+              <li key={i} className="flex flex-col gap-3 rounded-xl bg-card p-3 shadow-sm">
+                <div className="flex items-center gap-2">
                 <select
                   value={r.templateId}
                   onChange={(e) => {
                     const t = active.find((x) => x.id === e.target.value);
                     set({ templateId: e.target.value, minutes: t?.defaultMinutes ?? r.minutes });
                   }}
-                  className="rounded-md border border-ink/15 bg-transparent px-2 py-1"
+                  aria-label={uk.templates.templateName}
+                  className="field-select min-w-0 flex-1"
                 >
                   {active.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
                 </select>
-                <SizePicker compact exact minutes={r.minutes} onChange={(m) => set({ minutes: m })} />
-                <WeekdayToggles value={r.weekdays} onChange={(w) => set({ weekdays: w })} />
-                <button
-                  type="button"
-                  aria-label="Прибрати"
-                  onClick={() => setRows(recRows.filter((_, k) => k !== i))}
-                  className="ml-auto text-ink-soft hover:text-ink"
-                >
+                <IconButton label={uk.onboarding.remove} onClick={() => setRows(recRows.filter((_, k) => k !== i))} className="-mr-1">
                   ✕
-                </button>
+                </IconButton>
+                </div>
+                <SizePicker exact minutes={r.minutes} onChange={(m) => set({ minutes: m })} />
+                <WeekdayToggles value={r.weekdays} onChange={(w) => set({ weekdays: w })} />
               </li>
             );
           })}
@@ -136,9 +134,11 @@ export function OnboardingScreen() {
         )}
       </section>
 
-      <button type="button" className="btn-solid self-start px-5 py-2.5 text-base" onClick={finish}>
-        {uk.onboarding.done}
-      </button>
+      <div className="sticky bottom-0 -mx-4 bg-paper/90 px-4 pt-3 pb-[calc(var(--sab)+12px)] backdrop-blur md:static md:mx-0 md:bg-transparent md:px-0 md:pb-8 md:backdrop-blur-none">
+        <button type="button" className="btn-solid w-full px-5 text-base md:w-auto" onClick={finish}>
+          {uk.onboarding.done}
+        </button>
+      </div>
     </div>
   );
 }
