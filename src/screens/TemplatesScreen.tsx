@@ -51,7 +51,7 @@ export function TemplatesScreen() {
             + {uk.templates.newCategory}
           </button>
         </div>
-        <ul className="grid gap-2 md:grid-cols-2">
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2">
           {visibleCats.map((c) => <CategoryRow key={c.id} c={c} all={categories} autoFocus={focusId === c.id} />)}
         </ul>
       </section>
@@ -74,7 +74,7 @@ export function TemplatesScreen() {
             + {uk.templates.newTemplate}
           </button>
         </div>
-        <ul className="grid gap-2 md:grid-cols-2">
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2">
           {visibleTpls.map((t) => (
             <TemplateRow key={t.id} t={t} categories={categories} autoFocus={focusId === t.id} />
           ))}

@@ -62,7 +62,7 @@ export function OnboardingScreen() {
       <section className="flex flex-col gap-2">
         <h2 className="font-semibold">{uk.onboarding.step1}</h2>
         <p className="text-sm text-ink-soft">{uk.onboarding.step1Hint}</p>
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
           {categories.filter((c) => !c.archived).map((c) => (
             <li key={c.id} className="flex items-center gap-2 rounded-xl bg-card px-3 py-2 shadow-sm">
               <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: c.color }} aria-hidden />

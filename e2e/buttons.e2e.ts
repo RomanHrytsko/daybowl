@@ -120,13 +120,15 @@ test.describe('усі кнопки працюють', () => {
     await tabBar(page).getByRole('button', { name: 'Шаблони' }).tap();
 
     await page.getByRole('button', { name: '+ Нова категорія' }).tap();
-    await expect(page.locator(':focus')).toHaveValue('Нова категорія');
+    // чекаємо саме поле з фокусом: одразу після тапу фокус ще на кнопці «+»
+    const focusedCat = page.getByRole('textbox', { name: 'Назва категорії' }).and(page.locator(':focus'));
+    await expect(focusedCat).toHaveValue('Нова категорія');
     await page.keyboard.type('Музика');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('textbox', { name: 'Назва категорії' }).nth(-1)).toHaveValue('Музика');
 
     await page.getByRole('button', { name: '+ Новий шаблон' }).tap();
-    await expect(page.locator(':focus')).toHaveValue('Новий шаблон');
+    await expect(page.getByRole('textbox', { name: 'Назва шаблону' }).and(page.locator(':focus'))).toHaveValue('Новий шаблон');
 
     // ⋯ → Архівувати → зникає; перемикач архівних → видно → ⋯ → Повернути
     await page.getByRole('button', { name: 'Ще дії: Музика' }).tap();

@@ -18,6 +18,9 @@ export default defineConfig({
   testDir: 'e2e',
   testMatch: '**/*.e2e.ts',
   fullyParallel: true,
+  // Headless WebKit на Linux рендерить програмно: кілька паралельних екземплярів на раннері GitHub
+  // зупиняють requestAnimationFrame (1–3 кадри/с), і перевірка «stable» у tap() висить до таймауту.
+  workers: CI ? 1 : undefined,
   forbidOnly: CI,
   retries: CI ? 1 : 0,
   reporter: CI ? [['github'], ['html', { open: 'never' }]] : 'list',
@@ -27,6 +30,8 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     // service worker кешує збірку між тестами — тут він не потрібен
     serviceWorkers: 'block',
+    // застосунок підтримує prefers-reduced-motion: без безкінечних хвиль у чашах і анімації листів
+    reducedMotion: 'reduce',
   },
   projects: [
     { name: 'iphone-17', use: phone(402, 874) },

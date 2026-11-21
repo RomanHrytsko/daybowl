@@ -39,7 +39,8 @@ export function DayScreen() {
     <div className="flex flex-col gap-4 md:gap-5">
       {header}
 
-      <div className="grid gap-4 md:grid-cols-[minmax(0,22rem)_1fr] md:gap-6">
+      {/* minmax(0,1fr): широкий вміст (інший шрифт, довгі назви) не розпирає колонку за межі екрана */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] md:gap-6">
         <div className="flex flex-col items-center gap-2">
           <BowlSvg
             stats={stats}
