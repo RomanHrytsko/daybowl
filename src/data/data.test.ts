@@ -1,11 +1,17 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { db } from './db';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import Dexie from 'dexie';
+import { DaybowlDB, SCHEMA_V1, db } from './db';
 import { seedIfEmpty } from './seed';
 import {
   activitiesOfWeek, addActivity, copyWeek, deleteActivity, ensureRecurrences, moveActivity, shiftActivity,
 } from './repos/activities';
-import { createTemplate } from './repos/templates';
-import { exportData, importData, parseBackup } from './backup';
+import { createTemplate, deleteTemplate } from './repos/templates';
+import {
+  CategoryInUseError, categoryUsage, createCategory, deleteCategory, reassignAndDeleteCategory,
+} from './repos/categories';
+import { getSettings } from './repos/settings';
+import { backupOverdueDays, exportData, importData, parseBackup, saveBackup } from './backup';
+import { act, cat, tpl } from '../test/factories';
 
 const WEEK = '2026-11-23';
 
@@ -90,5 +96,133 @@ describe('резервна копія', () => {
 
   it('відхиляє чужий файл', () => {
     expect(() => parseBackup('{"foo":1}')).toThrow();
+  });
+});
+
+describe('нагадування про копію', () => {
+  const now = new Date('2026-11-30T12:00:00Z');
+
+  it('мовчить без справ або якщо копія свіжа', () => {
+    expect(backupOverdueDays({ lastBackupAt: '2026-11-01T00:00:00Z' }, false, now)).toBeNull();
+    expect(backupOverdueDays({ lastBackupAt: '2026-11-25T00:00:00Z' }, true, now)).toBeNull();
+  });
+
+  it('нагадує через 7 днів; без копії рахує від онбордингу', () => {
+    expect(backupOverdueDays({ lastBackupAt: '2026-11-20T00:00:00Z' }, true, now)).toBe(10);
+    expect(backupOverdueDays({ onboardedAt: '2026-11-23T00:00:00Z' }, true, now)).toBe(7);
+    expect(backupOverdueDays({ onboardedAt: '2026-11-28T00:00:00Z' }, true, now)).toBeNull();
+  });
+
+  it('saveBackup запам\'ятовує дату копії', async () => {
+    URL.createObjectURL ??= () => 'blob:x';
+    URL.revokeObjectURL ??= () => {};
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    await saveBackup();
+    expect((await getSettings()).lastBackupAt).toBeTruthy();
+  });
+});
+
+describe('видалення шаблонів і категорій', () => {
+  it('видалений шаблон лишає вже створені справи і більше не генерує повторів', async () => {
+    const c = (await db.categories.toArray())[1];
+    const t = await createTemplate({
+      title: 'Робота', categoryId: c.id, defaultMinutes: 240,
+      recurrence: { weekdays: [1, 2], startDate: WEEK },
+    });
+    await ensureRecurrences(WEEK);
+    expect(await activitiesOfWeek(WEEK)).toHaveLength(2);
+
+    await deleteTemplate(t.id);
+    expect(await db.templates.get(t.id)).toBeUndefined();
+    const acts = await activitiesOfWeek(WEEK);
+    expect(acts.map((a) => [a.title, a.categoryId, a.minutes])).toEqual([
+      ['Робота', c.id, 240], ['Робота', c.id, 240],
+    ]);
+
+    await ensureRecurrences('2026-11-30');
+    expect(await activitiesOfWeek('2026-11-30')).toHaveLength(0);
+  });
+
+  it('невикористана категорія видаляється фізично', async () => {
+    const c = await createCategory({ name: 'Нова', color: '#000', kind: 'neutral' });
+    await deleteCategory(c.id);
+    expect(await db.categories.get(c.id)).toBeUndefined();
+  });
+
+  it('використану категорію не можна просто видалити', async () => {
+    const c = await createCategory({ name: 'Нова', color: '#000', kind: 'neutral' });
+    await addActivity({ date: WEEK, title: 'A', categoryId: c.id, minutes: 30 });
+    await expect(deleteCategory(c.id)).rejects.toBeInstanceOf(CategoryInUseError);
+    expect(await db.categories.get(c.id)).toBeDefined();
+  });
+
+  it('перенесення переводить справи й шаблони в іншу категорію і видаляє стару', async () => {
+    const from = await createCategory({ name: 'Стара', color: '#000', kind: 'neutral' });
+    const to = (await db.categories.orderBy('order').first())!;
+    await addActivity({ date: WEEK, title: 'A', categoryId: from.id, minutes: 30 });
+    await createTemplate({ title: 'T', categoryId: from.id, defaultMinutes: 30 });
+    expect(await categoryUsage(from.id)).toEqual({ activities: 1, templates: 1 });
+
+    await reassignAndDeleteCategory(from.id, to.id);
+    expect(await db.categories.get(from.id)).toBeUndefined();
+    expect(await categoryUsage(from.id)).toEqual({ activities: 0, templates: 0 });
+    const [a] = await activitiesOfWeek(WEEK);
+    expect(a.categoryId).toBe(to.id);
+  });
+
+  it('перенесення у неіснуючу категорію нічого не змінює', async () => {
+    const from = await createCategory({ name: 'Стара', color: '#000', kind: 'neutral' });
+    await addActivity({ date: WEEK, title: 'A', categoryId: from.id, minutes: 30 });
+    await expect(reassignAndDeleteCategory(from.id, 'nope')).rejects.toThrow();
+    expect(await db.categories.get(from.id)).toBeDefined();
+    expect((await activitiesOfWeek(WEEK))[0].categoryId).toBe(from.id);
+  });
+});
+
+describe('міграції схеми', () => {
+  it('схема version(1) заморожена', () => {
+    // Якщо цей тест падає — ви змінили v1. Поверніть її і додайте version(2) (див. db.ts).
+    expect(SCHEMA_V1).toEqual({
+      activities: 'id, date, [date+order], templateId',
+      dayConfigs: 'date',
+      categories: 'id, order',
+      templates: 'id, usageCount',
+      settings: 'id',
+    });
+  });
+
+  it('база, створена схемою v1, відкривається поточною DaybowlDB без втрат', async () => {
+    const name = 'daybowl-v1-fixture';
+    await Dexie.delete(name);
+    const old = new Dexie(name);
+    old.version(1).stores({
+      activities: 'id, date, [date+order], templateId',
+      dayConfigs: 'date',
+      categories: 'id, order',
+      templates: 'id, usageCount',
+      settings: 'id',
+    });
+    const c = cat({ name: 'Спорт' });
+    const t = tpl({ categoryId: c.id });
+    const a = act({ categoryId: c.id, templateId: t.id });
+    const settings = { id: 'settings', defaultCapacityMinutes: 900, weekStartsOn: 1, schemaVersion: 1, onboardedAt: '2026-11-01T00:00:00.000Z' };
+    await old.table('categories').add(c);
+    await old.table('templates').add(t);
+    await old.table('activities').add(a);
+    await old.table('dayConfigs').add({ id: 'd', createdAt: '', updatedAt: '', date: WEEK, capacityMinutes: 600 });
+    await old.table('settings').add(settings);
+    old.close();
+
+    const cur = new DaybowlDB(name);
+    try {
+      expect(await cur.categories.toArray()).toEqual([c]);
+      expect(await cur.templates.toArray()).toEqual([t]);
+      expect(await cur.activities.where('date').equals(a.date).toArray()).toEqual([a]);
+      expect((await cur.dayConfigs.get(WEEK))?.capacityMinutes).toBe(600);
+      expect(await cur.settings.get('settings')).toEqual(settings);
+    } finally {
+      cur.close();
+      await Dexie.delete(name);
+    }
   });
 });

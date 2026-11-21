@@ -1,7 +1,8 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getSettings, updateSettings } from '../data/repos/settings';
-import { downloadBackup, exportData, importData, parseBackup } from '../data/backup';
+import { importData, parseBackup, saveBackup } from '../data/backup';
+import { storageStatus, type StorageStatus } from '../data/persistence';
 import { useUi } from '../state/uiStore';
 import { uk } from '../i18n/uk';
 
@@ -9,6 +10,10 @@ export function SettingsScreen() {
   const settings = useLiveQuery(() => getSettings(), []);
   const fileRef = useRef<HTMLInputElement>(null);
   const showToast = useUi((s) => s.showToast);
+  const [storage, setStorage] = useState<StorageStatus>();
+  useEffect(() => {
+    storageStatus().then(setStorage).catch(() => {});
+  }, []);
   if (!settings) return null;
 
   const onImport = async (file: File) => {
@@ -46,8 +51,12 @@ export function SettingsScreen() {
       <section className="rounded-2xl bg-card p-4 shadow-sm">
         <h2 className="font-medium">{uk.settings.backup}</h2>
         <p className="text-sm text-ink-soft">{uk.settings.privacy}</p>
+        <p className="mt-2 text-sm">
+          {settings.lastBackupAt ? uk.settings.lastBackup(formatDateTime(settings.lastBackupAt)) : uk.settings.noBackup}
+        </p>
+        <p className="text-xs text-ink-soft">{uk.settings.backupTip}</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className="btn-solid" onClick={async () => downloadBackup(await exportData())}>
+          <button type="button" className="btn-solid" onClick={() => saveBackup()}>
             {uk.settings.export}
           </button>
           <button type="button" className="btn-ghost" onClick={() => fileRef.current?.click()}>
@@ -67,9 +76,30 @@ export function SettingsScreen() {
         </div>
       </section>
 
+      <section className="rounded-2xl bg-card p-4 text-sm shadow-sm">
+        <p>
+          {uk.settings.storage}:{' '}
+          {storage?.persisted ? uk.settings.storagePersisted : uk.settings.storageBestEffort}
+          {storage?.usage !== undefined && (
+            <span className="text-ink-soft"> · {uk.settings.storageUsed(formatBytes(storage.usage))}</span>
+          )}
+        </p>
+        <p className="mt-1 text-xs text-ink-soft">{uk.settings.version(__APP_VERSION__)}</p>
+      </section>
+
       <button type="button" className="btn-ghost self-start" onClick={() => updateSettings({ onboardedAt: undefined })}>
         {uk.settings.onboarding}
       </button>
     </div>
   );
+}
+
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString('uk-UA', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function formatBytes(n: number) {
+  if (n < 1024) return `${n} Б`;
+  if (n < 1024 ** 2) return `${(n / 1024).toFixed(0)} КБ`;
+  return `${(n / 1024 ** 2).toFixed(1)} МБ`;
 }

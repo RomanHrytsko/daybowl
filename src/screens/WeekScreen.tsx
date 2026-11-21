@@ -12,6 +12,7 @@ import { formatHours } from '../domain/format';
 import type { Activity, Category } from '../domain/types';
 import { uk } from '../i18n/uk';
 import { IconButton, toLayers, weekRange, weekdayShort } from './shared';
+import { WeekBanners } from './WeekBanners';
 
 export function WeekScreen() {
   const { weekStart, setWeek, openDay, showToast } = useUi();
@@ -35,6 +36,7 @@ export function WeekScreen() {
 
   return (
     <div className="flex flex-col gap-5">
+      <WeekBanners />
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="text-sm text-ink-soft">{uk.week.selfTotal}</div>
