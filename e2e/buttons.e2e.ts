@@ -61,6 +61,13 @@ test.describe('усі кнопки працюють', () => {
     await page.getByRole('button', { name: 'Попередній день' }).tap();
     await expect.poll(() => hash(page)).toContain(today);
 
+    // група категорії розгортається і згортається
+    const restGroup = page.getByRole('button', { name: /^Відпочинок/ });
+    await expect(restGroup).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByRole('button', { name: /Читання/ })).toHaveCount(0);
+    await restGroup.tap();
+    await expect(restGroup).toHaveAttribute('aria-expanded', 'true');
+
     // чип шаблону → новий шар
     await page.getByRole('button', { name: /Читання/ }).tap();
     await expect(list.getByText('Читання')).toBeVisible();
