@@ -20,19 +20,20 @@ test.describe('верстка на iPhone', () => {
     await expect(page.getByText(/Перетягніть/)).toHaveCount(0);
   });
 
-  test('день із розгорнутою справою: чаша і перший ряд чипів на першому екрані', async ({ page }) => {
+  test('день із розгорнутою справою: чаша і перша група шаблонів на першому екрані', async ({ page }) => {
     await finishOnboarding(page);
     await openToday(page);
 
     const bowl = page.getByRole('img', { name: / з / }).first();
-    // чипи відсортовано за популярністю — перевіряємо саме перший у ряду
-    const chipsRow = page.getByRole('button', { name: /Своя справа/ }).locator('xpath=..');
-    const firstChip = chipsRow.getByRole('button').first();
+    const groups = page.getByRole('list', { name: 'Шаблони за категоріями' });
+    const firstGroup = groups.getByRole('button').first();
     await expect(bowl).toBeInViewport({ ratio: 1 });
-    const chipBox = (await firstChip.boundingBox())!;
+    const groupBox = (await firstGroup.boundingBox())!;
     const tabTop = (await tabBar(page).boundingBox())!.y;
-    expect(chipBox.y + chipBox.height, 'перший ряд чипів над таб-панеллю').toBeLessThanOrEqual(tabTop);
+    expect(groupBox.y + groupBox.height, 'заголовок першої групи над таб-панеллю').toBeLessThanOrEqual(tabTop);
 
+    await groups.getByRole('button', { name: /^Відпочинок/ }).tap();
+    await expectCleanLayout(page, 'День (розгорнута група шаблонів)');
     await page.getByRole('button', { name: /Читання/ }).tap();
     const list = page.getByRole('list', { name: 'Справи дня' });
     await list.getByRole('button', { name: /Читання/ }).tap();
@@ -43,6 +44,7 @@ test.describe('верстка на iPhone', () => {
   test('день: лист підтвердження видалення', async ({ page }) => {
     await finishOnboarding(page);
     await openToday(page);
+    await page.getByRole('button', { name: /^Відпочинок/ }).tap();
     await page.getByRole('button', { name: /Читання/ }).tap();
     const list = page.getByRole('list', { name: 'Справи дня' });
     await list.getByRole('button', { name: /Читання/ }).tap();

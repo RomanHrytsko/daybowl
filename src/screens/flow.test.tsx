@@ -22,7 +22,7 @@ function setViewport(width: number) {
 beforeEach(async () => {
   await Promise.all(db.tables.map((t) => t.clear()));
   location.hash = '';
-  useUi.setState({ screen: 'week', weekStart: weekStartOf(today()), date: today() });
+  useUi.setState({ screen: 'week', weekStart: weekStartOf(today()), date: today(), openTemplateGroups: [] });
 });
 
 afterEach(() => {
@@ -46,7 +46,10 @@ describe('сценарій першого тижня', () => {
     // відкрити понеділок і додати «Читання» одним тапом
     const monday = screen.getAllByRole('button', { name: /^пн / })[0];
     await user.click(monday);
-    await user.click(await screen.findByRole('button', { name: /Читання/ }));
+    // шаблони згруповано за категоріями: спершу розгорнути «Відпочинок»
+    const group = await screen.findByRole('button', { name: /^Відпочинок/, expanded: false });
+    await user.click(group);
+    await user.click(screen.getByRole('button', { name: /Читання/ }));
 
     const list = await screen.findByRole('list', { name: 'Справи дня' });
     expect(await within(list).findByText('Читання')).toBeInTheDocument();
@@ -119,7 +122,8 @@ describe('сценарій першого тижня', () => {
     await screen.findByText(/Для себе за тиждень/);
     act(() => useUi.getState().openDay(today()));
 
-    await user.click(await screen.findByRole('button', { name: /Читання/ }));
+    await user.click(await screen.findByRole('button', { name: /^Відпочинок/ }));
+    await user.click(screen.getByRole('button', { name: /Читання/ }));
     const list = await screen.findByRole('list', { name: 'Справи дня' });
     const row = (await within(list).findByText('Читання')).closest('li')!;
     await user.click(within(row).getByRole('button', { name: /Читання/, expanded: false }));

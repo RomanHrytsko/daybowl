@@ -3,7 +3,9 @@ import type { ActivityTemplate, Category } from '../../domain/types';
 import { sizeOf } from '../../domain/types';
 import { formatHours } from '../../domain/format';
 import { uk } from '../../i18n/uk';
+import { groupTemplates } from './group';
 import { SizePicker } from '../SizePicker';
+import { useUi } from '../../state/uiStore';
 
 interface Props {
   templates: ActivityTemplate[];
@@ -12,33 +14,30 @@ interface Props {
   onCustom: (input: { title: string; categoryId: string; minutes: number }) => void;
 }
 
-/** Ряд чипів у кольорах категорій: тап — справа падає в чашу. */
+/** Шаблони, згруповані у розкривні секції за категоріями: тап по чипу — справа падає в чашу. */
 export function TemplateChips({ templates, categories, onPick, onCustom }: Props) {
-  const cats = new Map(categories.map((c) => [c.id, c]));
-  const chips = templates
-    .filter((t) => !t.archived && !cats.get(t.categoryId)?.archived)
-    .sort((a, b) => b.usageCount - a.usageCount || a.title.localeCompare(b.title, 'uk'));
+  const groups = groupTemplates(templates, categories);
+  const openGroups = useUi((s) => s.openTemplateGroups);
+  const toggleGroup = useUi((s) => s.toggleTemplateGroup);
   const [open, setOpen] = useState(false);
 
   return (
-    <div>
-      <div className="flex flex-wrap gap-2">
-        {chips.map((t) => {
-          const c = cats.get(t.categoryId);
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => onPick(t)}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm transition active:scale-95 hover:shadow-sm"
-              style={{ borderColor: c?.color, background: `${c?.color ?? '#888'}1f` }}
-            >
-              <span className="h-2 w-2 rounded-full" style={{ background: c?.color }} aria-hidden />
-              {t.title}
-              <span className="text-xs text-ink-soft">{sizeOf(t.defaultMinutes) ?? formatHours(t.defaultMinutes)}</span>
-            </button>
-          );
-        })}
+    <div className="flex flex-col gap-2">
+      {groups.length > 0 && (
+        <ul className="flex flex-col gap-2" aria-label={uk.day.templateGroups}>
+          {groups.map(({ category: c, templates: items }) => (
+            <CategoryGroup
+              key={c.id}
+              category={c}
+              templates={items}
+              open={openGroups.includes(c.id)}
+              onToggle={() => toggleGroup(c.id)}
+              onPick={onPick}
+            />
+          ))}
+        </ul>
+      )}
+      <div>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
@@ -58,6 +57,55 @@ export function TemplateChips({ templates, categories, onPick, onCustom }: Props
         />
       )}
     </div>
+  );
+}
+
+function CategoryGroup({
+  category: c, templates, open, onToggle, onPick,
+}: {
+  category: Category;
+  templates: ActivityTemplate[];
+  open: boolean;
+  onToggle: () => void;
+  onPick: (t: ActivityTemplate) => void;
+}) {
+  const panelId = `tpl-group-${c.id}`;
+  return (
+    <li className="rounded-xl bg-card shadow-sm">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 py-1 text-left"
+      >
+        <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: c.color }} aria-hidden />
+        <span className="min-w-0 flex-1 truncate font-medium">{c.name}</span>
+        <span className="text-xs text-ink-soft" aria-label={uk.day.groupCount(templates.length)}>{templates.length}</span>
+        <span
+          className={`text-ink-soft transition-transform ${open ? 'rotate-90' : ''}`}
+          aria-hidden
+        >
+          ›
+        </span>
+      </button>
+      {open && (
+        <div id={panelId} className="flex flex-wrap gap-2 px-3 pt-1 pb-3">
+          {templates.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => onPick(t)}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm transition active:scale-95 hover:shadow-sm"
+              style={{ borderColor: c.color, background: `${c.color}1f` }}
+            >
+              {t.title}
+              <span className="text-xs text-ink-soft">{sizeOf(t.defaultMinutes) ?? formatHours(t.defaultMinutes)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </li>
   );
 }
 

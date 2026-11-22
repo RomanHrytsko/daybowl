@@ -8,10 +8,13 @@ interface UiState {
   weekStart: DateStr;
   date: DateStr;
   toast?: string;
+  /** розгорнуті групи шаблонів на екрані дня (id категорій) — живуть між днями до перезавантаження */
+  openTemplateGroups: string[];
   go: (screen: Screen) => void;
   openDay: (date: DateStr) => void;
   setWeek: (weekStart: DateStr) => void;
   showToast: (msg: string) => void;
+  toggleTemplateGroup: (categoryId: string) => void;
 }
 
 /** Хеш виду #/week/2026-11-23 або #/day/2026-11-25 — щоб працювала кнопка «назад». */
@@ -32,6 +35,7 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const useUi = create<UiState>((set, get) => ({
   ...parseHash(),
+  openTemplateGroups: [],
   go: (screen) => {
     set({ screen });
     writeHash(get());
@@ -48,6 +52,10 @@ export const useUi = create<UiState>((set, get) => ({
     set({ toast });
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => set({ toast: undefined }), 2500);
+  },
+  toggleTemplateGroup: (id) => {
+    const cur = get().openTemplateGroups;
+    set({ openTemplateGroups: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] });
   },
 }));
 

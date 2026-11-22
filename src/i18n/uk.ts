@@ -50,6 +50,8 @@ export const uk = {
     capacityReset: 'Скинути',
     empty: 'Чаша порожня. Тапніть по шаблону нижче, щоб додати справу.',
     custom: 'Своя справа',
+    templateGroups: 'Шаблони за категоріями',
+    groupCount: (n: number) => `шаблонів: ${n}`,
     add: 'Додати',
     titlePh: 'Назва',
     moveTo: 'Перенести на…',
